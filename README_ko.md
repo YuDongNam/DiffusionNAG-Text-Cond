@@ -102,23 +102,11 @@ train(
 )
 "
 
-# CPU 드라이런 테스트 (소형 모델, 2 에폭)
-python graph2graph/test_run.py
 ```
 
-### 추론
+## 추론 및 평가
 
-```bash
-python graph2graph/test_inference.py
-```
-
-이 스크립트는:
-1. `checkpoints/best.pt`에서 최적 체크포인트를 로드
-2. **역방향 확산** (50 스텝)을 **분류기 가이던스** (λ=1.0)와 함께 실행
-3. 생성된 텐서를 그래프 문자열로 디코딩
-4. **더미 텐서 컴파일** (실제 PyTorch 모델을 빌드하고 순전파 실행)을 통해 각 그래프의 DAG 유효성 검증
-
-### 프로그래밍 방식 사용
+실제 추론은 `step5_inference.py`에서 `GraphSampler`를 임포트하여 프로그래밍 방식으로 수행합니다. 샘플러는 학습된 디노이저와 예측기 모델을 사용하여 역방향 확산 프로세스를 실행하고 분류기 가이던스를 적용합니다.
 
 ```python
 from graph2graph.step5_inference import GraphSampler, decode_graph_tensors, validate_dag_compilation
@@ -135,6 +123,18 @@ gen_types, gen_attrs, gen_adj = sampler.sample(
 # 디코딩 및 유효성 검증
 graph_str = decode_graph_tensors(gen_types[0], gen_attrs[0], gen_adj[0], vocab)
 is_valid, msg = validate_dag_compilation(graph_str, dummy_input=torch.randn(1, 64, 32, 32))
+```
+
+## 테스트 및 드라이런
+
+저장소에는 CPU에서 파이프라인 로직을 검증하기 위한 두 가지 테스트 스크립트가 포함되어 있습니다. 이 스크립트들은 극단적으로 줄어든 타임스텝, 초소형 모델 사이즈, 그리고 더미 데이터를 사용합니다. **실제 학습이나 추론에 이 스크립트들을 사용하지 마십시오.**
+
+```bash
+# 학습 파이프라인 검증 (텐서 형태 오류 없이 컴파일되는지/실행되는지 확인)
+python graph2graph/test_run.py
+
+# 추론 파이프라인 검증 (역방향 확산 50 스텝 실행 및 DAG 유효성 테스트)
+python graph2graph/test_inference.py
 ```
 
 ## 요구 사항

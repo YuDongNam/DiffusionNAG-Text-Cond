@@ -100,25 +100,11 @@ train(
     num_epochs=100,
     device_str='auto',
 )
-"
-
-# CPU dry-run test (small model, 2 epochs)
-python graph2graph/test_run.py
 ```
 
-### Inference
+## Inference & Evaluation
 
-```bash
-python graph2graph/test_inference.py
-```
-
-This script:
-1. Loads the best checkpoint from `checkpoints/best.pt`
-2. Runs **reverse diffusion** (50 steps) with **classifier guidance** (λ=1.0)
-3. Decodes generated tensors → graph strings
-4. Validates each graph via **dummy tensor compilation** (builds a real PyTorch model and runs a forward pass)
-
-### Programmatic Usage
+Actual inference is performed programmatically by importing the `GraphSampler` from `step5_inference.py`. The sampler runs the reverse diffusion process and applies classifier guidance using your trained denoiser and predictor models.
 
 ```python
 from graph2graph.step5_inference import GraphSampler, decode_graph_tensors, validate_dag_compilation
@@ -135,6 +121,18 @@ gen_types, gen_attrs, gen_adj = sampler.sample(
 # Decode and validate
 graph_str = decode_graph_tensors(gen_types[0], gen_attrs[0], gen_adj[0], vocab)
 is_valid, msg = validate_dag_compilation(graph_str, dummy_input=torch.randn(1, 64, 32, 32))
+```
+
+## Testing & Dry Runs
+
+The repository includes two testing scripts for verifying the pipeline logic on a CPU. These scripts use artificially reduced timesteps, miniature models, and dummy data. **Do not use these for actual training or inference.**
+
+```bash
+# Verify the training pipeline (compiles without tensor shape errors)
+python graph2graph/test_run.py
+
+# Verify the inference pipeline (runs 50 steps of reverse diffusion and tests DAG validity)
+python graph2graph/test_inference.py
 ```
 
 ## Requirements
