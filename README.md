@@ -31,6 +31,7 @@ graph2graph/
 ├── step3_predictor.py      # Classifier guidance via cosine similarity (soft/hard)
 ├── step4_training.py       # Discrete diffusion, masked losses, training loop
 ├── step5_inference.py      # Reverse sampling, graph decoding, DAG validity checker
+├── evaluate.py             # Quantitative evaluation (Validity, Alignment, Modification)
 ├── test_run.py             # CPU dry-run training test
 └── test_inference.py       # End-to-end inference test with checkpoint loading
 ```
@@ -104,7 +105,13 @@ train(
 
 ## Inference & Evaluation
 
-Actual inference is performed programmatically by importing the `GraphSampler` from `step5_inference.py`. The sampler runs the reverse diffusion process and applies classifier guidance using your trained denoiser and predictor models.
+To evaluate the model quantitatively over the validation set, run the `evaluate.py` script. This script computes the Validity Rate, Text-Graph Alignment (Cosine Similarity), and Modification Rate:
+
+```bash
+python evaluate.py --batch_size 16 --num_timesteps 1000
+```
+
+Actual inference can also be performed programmatically by importing the `GraphSampler` from `step5_inference.py`. The sampler runs the reverse diffusion process and applies classifier guidance using your trained denoiser and predictor models.
 
 ```python
 from graph2graph.step5_inference import GraphSampler, decode_graph_tensors, validate_dag_compilation
