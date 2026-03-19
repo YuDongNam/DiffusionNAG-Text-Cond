@@ -32,7 +32,7 @@ CKPT_CANDIDATES = [
     os.path.join(os.getcwd(), "checkpoints", "best.pt"),    # CWD/checkpoints/
 ]
 
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 HIDDEN_DIM = 64          # test_run.py와 동일
 NUM_SAMPLE_STEPS = 50    # CPU 속도를 위해 1000 → 50으로 축소
 GUIDANCE_SCALE = 1.0
