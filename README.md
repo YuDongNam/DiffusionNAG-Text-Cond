@@ -108,7 +108,7 @@ train(
 To evaluate the model quantitatively over the validation set, run the `evaluate.py` script. This script computes the Validity Rate, Text-Graph Alignment (Cosine Similarity), and Modification Rate:
 
 ```bash
-python evaluate.py --batch_size 16 --num_timesteps 1000
+python evaluate.py --batch_size 16 --num_timesteps 1000 --seed 42
 ```
 
 Actual inference can also be performed programmatically by importing the `GraphSampler` from `step5_inference.py`. The sampler runs the reverse diffusion process and applies classifier guidance using your trained denoiser and predictor models.

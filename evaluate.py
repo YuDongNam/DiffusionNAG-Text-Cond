@@ -37,6 +37,7 @@ def evaluate(
     guidance_scale: float = 1.0,
     device_str: str = "auto",
     dataset_filter: str = None,
+    seed: int = 42,
 ):
     # Device setup
     if device_str == "auto":
@@ -57,6 +58,7 @@ def evaluate(
         batch_size=batch_size,
         text_embed_dict=text_embed_dict,
         num_workers=4,
+        seed=seed,
         max_samples=None,  # Must use full dataset to rebuild full vocab
     )
     print(f"Validating on {len(test_loader.dataset)} TEST samples ({len(test_loader)} batches).")
@@ -229,6 +231,7 @@ if __name__ == "__main__":
     parser.add_argument("--guidance_scale", type=float, default=1.0)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--dataset", type=str, default=None, help="Filter samples by dataset name in sample_id (e.g., cifar10)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for data splitting")
     
     args = parser.parse_args()
     
@@ -247,4 +250,5 @@ if __name__ == "__main__":
         guidance_scale=args.guidance_scale,
         device_str=args.device,
         dataset_filter=args.dataset,
+        seed=args.seed,
     )

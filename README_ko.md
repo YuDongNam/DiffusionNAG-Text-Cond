@@ -110,7 +110,7 @@ train(
 검증 데이터셋에 대해 모델을 정량적으로 평가하려면 `evaluate.py` 스크립트를 실행하십시오. 이 스크립트는 유효성 비율(Validity Rate), 텍스트-그래프 정렬도(Text-Graph Alignment), 그리고 수정 비율(Modification Rate)을 계산합니다:
 
 ```bash
-python evaluate.py --batch_size 16 --num_timesteps 1000
+python evaluate.py --batch_size 16 --num_timesteps 1000 --seed 42
 ```
 
 실제 추론은 `step5_inference.py`에서 `GraphSampler`를 임포트하여 프로그래밍 방식으로도 수행할 수 있습니다. 샘플러는 학습된 디노이저와 예측기 모델을 사용하여 역방향 확산 프로세스를 실행하고 분류기 가이던스를 적용합니다.
