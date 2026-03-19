@@ -36,6 +36,7 @@ def evaluate(
     num_timesteps: int = 1000,
     guidance_scale: float = 1.0,
     device_str: str = "auto",
+    dataset_filter: str = None,
 ):
     # Device setup
     if device_str == "auto":
@@ -121,8 +122,20 @@ def evaluate(
     print("\nStarting evaluation...")
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(val_loader)):
+            # Filter by dataset if specified
+            if dataset_filter:
+                valid_indices = [i for i, sid in enumerate(batch["sample_id"]) if dataset_filter in sid]
+                if not valid_indices:
+                    continue  # Skip batch entirely if no samples match the filter
+                
+                # Slice all tensors down to the matching subset
+                for k, v in batch.items():
+                    if isinstance(v, torch.Tensor):
+                        batch[k] = v[valid_indices]
+                batch["sample_id"] = [batch["sample_id"][i] for i in valid_indices]
+
             B = batch["parent_node_types"].size(0)
-            batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
             
             # Extract Parent Graph Strings (for modification rate check)
             parent_strings = []
@@ -236,9 +249,10 @@ def evaluate(
     print(f"Avg Latency (ms)     : {metrics['Avg_Latency_ms']:.2f} ms")
     print("="*50)
 
-    with open("results.json", "w") as f:
+    out_filename = f"results_{dataset_filter}.json" if dataset_filter else "results.json"
+    with open(out_filename, "w") as f:
         json.dump(metrics, f, indent=4)
-    print("Saved metrics to results.json")
+    print(f"Saved metrics to {out_filename}")
 
 
 if __name__ == "__main__":
@@ -250,8 +264,15 @@ if __name__ == "__main__":
     parser.add_argument("--num_timesteps", type=int, default=1000)
     parser.add_argument("--guidance_scale", type=float, default=1.0)
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--dataset", type=str, default=None, help="Filter samples by dataset name in sample_id (e.g., cifar10)")
     
     args = parser.parse_args()
+    
+    # Customize JSON output name based on filter to prevent overwriting
+    out_file = "results.json"
+    if args.dataset:
+        print(f"--- Applying dataset filter: {args.dataset} ---")
+        out_file = f"results_{args.dataset}.json"
     
     evaluate(
         jsonl_path=args.jsonl_path,
@@ -261,4 +282,5 @@ if __name__ == "__main__":
         num_timesteps=args.num_timesteps,
         guidance_scale=args.guidance_scale,
         device_str=args.device,
+        dataset_filter=args.dataset,
     )

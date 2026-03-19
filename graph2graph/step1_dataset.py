@@ -413,6 +413,8 @@ class NADTripletDataset(Dataset):
             "child_mask":        c_mask,    # [N_MAX]           = [110]
             # Text  -----------------------------------------------------
             "text_embedding":    text_emb,  # [TEXT_EMBED_DIM]  = [768]
+            # Metadata --------------------------------------------------
+            "sample_id":         sample_id, # string
         }
 
 
