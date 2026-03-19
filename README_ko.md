@@ -25,13 +25,13 @@
 ## 파일 구조
 
 ```
+evaluate.py                 # 정량적 평가 (유효성, 정렬도, 수정 비율)
 graph2graph/
 ├── step1_dataset.py        # 데이터 파싱, GraphVocabulary, N_MAX=110 패딩
 ├── step2_denoising_gnn.py  # 3개 출력 헤드를 가진 4층 GIN 디노이저
 ├── step3_predictor.py      # 코사인 유사도 기반 분류기 가이던스 (소프트/하드 모드)
 ├── step4_training.py       # 이산 확산, 마스크된 손실함수, 학습 루프
 ├── step5_inference.py      # 역방향 샘플링, 그래프 디코딩, DAG 유효성 검증기
-├── evaluate.py             # 정량적 평가 (유효성, 정렬도, 수정 비율)
 ├── test_run.py             # CPU 드라이런 학습 테스트
 └── test_inference.py       # 체크포인트 로드 → 추론 end-to-end 테스트
 ```

@@ -25,13 +25,13 @@ Timestep t ──┘     ├─ Attribute logits    [N × K × C_k]
 ## File Structure
 
 ```
+evaluate.py                 # Quantitative evaluation (Validity, Alignment, Modification)
 graph2graph/
 ├── step1_dataset.py        # Data parsing, GraphVocabulary, padding to N_MAX=110
 ├── step2_denoising_gnn.py  # 4-layer GIN denoiser with 3 output heads
 ├── step3_predictor.py      # Classifier guidance via cosine similarity (soft/hard)
 ├── step4_training.py       # Discrete diffusion, masked losses, training loop
 ├── step5_inference.py      # Reverse sampling, graph decoding, DAG validity checker
-├── evaluate.py             # Quantitative evaluation (Validity, Alignment, Modification)
 ├── test_run.py             # CPU dry-run training test
 └── test_inference.py       # End-to-end inference test with checkpoint loading
 ```
