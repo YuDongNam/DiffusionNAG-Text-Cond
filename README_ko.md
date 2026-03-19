@@ -88,7 +88,16 @@ torch.save(embed_dict, "baidu_text_embeddings.pt")
 cd DiffusionNAG
 
 # 전체 학습 (GPU 권장)
-python graph2graph/step4_training.py  # 기본값: hidden_dim=256, epochs=100
+python -c "
+from graph2graph.step4_training import train
+train(
+    jsonl_path='NAD_triplet_dataset.jsonl',
+    hidden_dim=256,
+    batch_size=32,
+    num_epochs=100,
+    device_str='auto',
+)
+"
 
 # 실제 텍스트 임베딩 사용
 python -c "
@@ -124,7 +133,7 @@ sampler = GraphSampler(denoiser, predictor, diffusion, vocab, device, guidance_s
 # 부모 DAG + 텍스트 임베딩 → 자식 DAG 생성
 gen_types, gen_attrs, gen_adj = sampler.sample(
     parent_node_types, parent_node_attrs, parent_adj, parent_mask,
-    text_embedding, num_steps=100,
+    text_embedding, num_steps=1000,
 )
 
 # 디코딩 및 유효성 검증
