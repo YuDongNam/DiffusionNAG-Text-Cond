@@ -459,19 +459,35 @@ def create_dataloaders(
     )
     vocab = full_dataset.vocab
 
-    # 80/10/10 split indices
-    n = len(full_dataset)
-    indices = list(range(n))
+    # Stratified 80/10/10 split by 'dataset' feature
+    from collections import defaultdict
     import random
+    
+    dataset_to_indices = defaultdict(list)
+    for i, sample in enumerate(full_dataset.data):
+        dname = sample.get("dataset", "unknown")
+        dataset_to_indices[dname].append(i)
+
+    train_indices = []
+    val_indices = []
+    test_indices = []
+    
     random.seed(seed)
-    random.shuffle(indices)
     
-    train_split = int(n * 0.8)
-    val_split = int(n * 0.9)
-    
-    train_indices = indices[:train_split]
-    val_indices = indices[train_split:val_split]
-    test_indices = indices[val_split:]
+    for dname, indices in dataset_to_indices.items():
+        random.shuffle(indices)
+        n = len(indices)
+        train_split = int(n * 0.8)
+        val_split = int(n * 0.9)
+        
+        train_indices.extend(indices[:train_split])
+        val_indices.extend(indices[train_split:val_split])
+        test_indices.extend(indices[val_split:])
+        
+    # Shuffle the combined subsets so batches have a mix of all datasets
+    random.shuffle(train_indices)
+    random.shuffle(val_indices)
+    random.shuffle(test_indices)
 
     train_subset = torch.utils.data.Subset(full_dataset, train_indices)
     val_subset = torch.utils.data.Subset(full_dataset, val_indices)
