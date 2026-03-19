@@ -12,6 +12,7 @@ Outputs are saved to `results.json`.
 import os
 import sys
 import json
+import time
 import argparse
 import torch
 import torch.nn.functional as F
@@ -48,6 +49,19 @@ def evaluate(
     if text_embed_path and os.path.exists(text_embed_path):
         text_embed_dict = torch.load(text_embed_path, map_location="cpu")
         print(f"Loaded {len(text_embed_dict)} real text embeddings.")
+
+    # Build known_graphs set for Novelty calculation
+    known_graphs = set()
+    print("Building known graphs set for Novelty calculation...")
+    with open(jsonl_path, 'r') as f:
+        for line in f:
+            sample = json.loads(line)
+            # Normalize by stripping the first line (block name like ##ParentBlock##)
+            p_core = "\n".join(sample["parent_graph"].strip().split("\n")[1:])
+            c_core = "\n".join(sample["child_graph"].strip().split("\n")[1:])
+            known_graphs.add(p_core)
+            known_graphs.add(c_core)
+    print(f"Found {len(known_graphs)} unique graph topologies in dataset.")
 
     # Data Loader (Validation Split)
     _, val_loader, vocab = create_dataloaders(
@@ -100,6 +114,9 @@ def evaluate(
     valid_count = 0
     modified_count = 0
     total_cosine_sim = 0.0
+    
+    valid_graph_strs = []  # For Uniqueness / Novelty
+    latencies = []         # For Latency (forward pass time of valid graphs)
 
     print("\nStarting evaluation...")
     with torch.no_grad():
@@ -151,33 +168,58 @@ def evaluate(
             ).squeeze(1)  # [B]
             total_cosine_sim += align_sim.sum().item()
 
-            # 3. Validity & Modification Rate
+            # 3. Validity, Modification Rate & Latency
+            # dummy_input MUST remain on CPU because validate_dag_compilation initializes modules on CPU
             dummy_input = torch.randn(1, 16, 32, 32)
             for b in range(B):
                 gen_str = decode_graph_tensors(
                     gen_types[b], gen_attrs[b], gen_adj[b], vocab, block_name="GenBlock"
                 )
                 
-                # Check Validity
+                # Check Validity & Latency
+                # We measure the time taken to build and run the graph
+                t0 = time.perf_counter()
                 is_valid, _ = validate_dag_compilation(gen_str, dummy_input)
+                t1 = time.perf_counter()
+                
+                g_core = "\n".join(gen_str.split("\n")[1:])  # normalized string without header
+                
                 if is_valid:
                     valid_count += 1
+                    valid_graph_strs.append(g_core)
+                    latencies.append((t1 - t0) * 1000)  # ms
                 
                 # Check Modification
                 # Extract the core architecture part (ignore the ##BlockName## header)
                 p_core = "\n".join(parent_strings[b].split("\n")[1:])
-                g_core = "\n".join(gen_str.split("\n")[1:])
                 if p_core != g_core:
                     modified_count += 1
             
             total_samples += B
 
+    # Calculate Uniqueness & Novelty
+    if valid_count > 0:
+        unique_valid_graphs = set(valid_graph_strs)
+        uniqueness_rate = len(unique_valid_graphs) / valid_count
+        
+        novel_graphs = unique_valid_graphs - known_graphs
+        novelty_rate = len(novel_graphs) / len(unique_valid_graphs)
+        
+        avg_latency_ms = sum(latencies) / len(latencies)
+    else:
+        uniqueness_rate = 0.0
+        novelty_rate = 0.0
+        avg_latency_ms = 0.0
+
     # Aggregate Metrics
     metrics = {
         "Total_Samples": total_samples,
         "Validity_Rate": float(valid_count) / total_samples,
-        "Text_Graph_Alignment": total_cosine_sim / total_samples,
+        "Uniqueness_Rate": uniqueness_rate,
+        "Novelty_Rate": novelty_rate,
         "Modification_Rate": float(modified_count) / total_samples,
+        "Text_Graph_Alignment": total_cosine_sim / total_samples,
+        "Avg_Latency_ms": avg_latency_ms,
         "Num_Timesteps": num_timesteps,
         "Guidance_Scale": guidance_scale
     }
@@ -186,9 +228,12 @@ def evaluate(
     print("🎯 Evaluation Results")
     print("="*50)
     print(f"Total Samples Tested : {metrics['Total_Samples']}")
-    print(f"Validing Rate (%)    : {metrics['Validity_Rate'] * 100:.2f}%")
+    print(f"Validity Rate (%)    : {metrics['Validity_Rate'] * 100:.2f}%")
+    print(f"Uniqueness Rate (%)  : {metrics['Uniqueness_Rate'] * 100:.2f}%")
+    print(f"Novelty Rate (%)     : {metrics['Novelty_Rate'] * 100:.2f}%")
     print(f"Modification Rate (%): {metrics['Modification_Rate'] * 100:.2f}%")
     print(f"Text-Graph Alignment : {metrics['Text_Graph_Alignment']:.4f}")
+    print(f"Avg Latency (ms)     : {metrics['Avg_Latency_ms']:.2f} ms")
     print("="*50)
 
     with open("results.json", "w") as f:
