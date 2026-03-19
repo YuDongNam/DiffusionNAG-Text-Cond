@@ -1,15 +1,61 @@
-__pycache__
-checkpoints/
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ============================================================================
+# Virtual Environments
+# ============================================================================
+.venv/
+venv/
+env/
+ENV/
+
+# ============================================================================
+# IDE / Editor
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================================================
+# Jupyter
+# ============================================================================
+.ipynb_checkpoints/
+
+# ============================================================================
+# Heavy Data Files (CRITICAL — prevent repository bloating)
+# ============================================================================
+
+# Dataset files
+*.jsonl
+
+# PyTorch embedding dictionaries (e.g., baidu_text_embeddings.pt)
+# These are large pre-computed tensors that must NOT be committed.
 *.pt
-!NAS-Bench-201/configs/transfer_nag_config.pt
-!NAS-Bench-201/data/transfer_nag/ridx.pt
-!NAS-Bench-201/data/transfer_nag/nasbench201.pt
-!NAS-Bench-201/data/transfer_nag/nasbench201_info.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_tasks_predictor.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_tasks_predictor_idx.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_task_lst.pt
-exp/
-vis/
-results/
-.empty/
-.prev/
+
+# Legacy per-sample embedding files
+*.npy
+
+# External large files/folders
+MobileNetV3/
+NAS-Bench-201/
+
+# ============================================================================
+# Training Artifacts
+# ============================================================================
+checkpoints/
+runs/
+wandb/
+*.log
+

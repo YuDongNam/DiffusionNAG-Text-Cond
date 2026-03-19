@@ -1,143 +1,150 @@
-# DiffusionNAG: Predictor-guided Neural Architecture Generation with Diffusion Models
+# Text-Conditioned Graph-to-Graph Translation Baseline
 
-Official Code Repository for the paper [DiffusionNAG: Predictor-guided Neural Architecture Generation with Diffusion Models](https://arxiv.org/abs/2305.16943).
+A discrete diffusion baseline for **DAG-to-DAG translation**, where a parent neural architecture graph is transformed into a child architecture graph guided by a natural-language text embedding. Built on concepts from [DiffusionNAG](https://arxiv.org/abs/2305.16943), this implementation replaces continuous diffusion with a **D3PM-style categorical diffusion** process over discrete node types, attributes, and edges.
 
-<img align="middle" width="800" src="assets/DiffusionNAG-illustration.png">
-
-
-## Why DiffusionNAG?
-
-+ Existing NAS approaches still result in large waste of time as they need to explore an extensive search space and the property predictors mostly play a passive role such as the evaluators that rank architecture candidates provided by a search strategy to simply filter them out during the search process.
-
-+ We introduce a novel predictor-guided **Diffusion**-based **N**eural **A**rchitecture **G**enerative framework called **DiffusionNAG**, which explicitly incorporates the predictors into generating architectures that satisfy the objectives.
-
-+ DiffusionNAG offers several advantages compared with conventional NAS methods, including efficient and effective search, superior utilization of predictors for both NAG and evaluation purposes, and easy adaptability across diverse tasks.
-
-
-## Environment Setup
-
-Create environment with **Python 3.7.2** and **Pytorch 1.13.1**. 
-Use the following command to install the requirements:
+## Architecture
 
 ```
-cd setup
-conda create -n diffusionnag python==3.7.2
-conda activate diffusionnag
-bash install.sh
+Parent DAG ──┐
+Text Embed ──┤──▶ DenoisingGNN (4-layer GIN) ──▶ Predicted Clean G₀
+Noisy G_t  ──┤     ├─ Node Type logits   [N × 27]
+Timestep t ──┘     ├─ Attribute logits    [N × K × C_k]
+                   └─ Edge logits         [N × N × 2]
+                              │
+                    ┌─────────▼──────────┐
+                    │ PredictorNetwork   │
+                    │ (3-layer GCN)      │
+                    │ cos_sim(graph,text) │
+                    └─────────┬──────────┘
+                              │ ∇ guidance
+                              ▼
+                      Guided Posterior
+                      q(x_{t-1}|x_t, x̂₀)
 ```
 
-## Run - NAS-Bench-201
-### Download datasets, preprocessed datasets, and checkpoints
-```
-cd NAS-Bench-201
-```
+## File Structure
 
-If you want to run experiments on datasets that are not included in the benchmark, such as "aircraft" or "pets", you will need to download the raw dataset for actually trainining neural architectures on it:
 ```
-## Download the raw dataset
-bash script/download_raw_dataset.sh [DATASET]
-```
-
-We use dataset encoding when training the meta-predictor or performing conditional sampling with the target dataset. To obtain dataset encoding, you need to download the preprocessed dataset:
-```
-## Download the preprocessed dataset
-bash script/download_preprocessed_dataset.sh
+graph2graph/
+├── step1_dataset.py        # Data parsing, GraphVocabulary, padding to N_MAX=110
+├── step2_denoising_gnn.py  # 4-layer GIN denoiser with 3 output heads
+├── step3_predictor.py      # Classifier guidance via cosine similarity (soft/hard)
+├── step4_training.py       # Discrete diffusion, masked losses, training loop
+├── step5_inference.py      # Reverse sampling, graph decoding, DAG validity checker
+├── test_run.py             # CPU dry-run training test
+└── test_inference.py       # End-to-end inference test with checkpoint loading
 ```
 
-If you want to use the pre-trained score network or meta-predictor, download the checkpoints from the following links.
+| Module | Key Design Decision |
+|---|---|
+| **step1** | `N_MAX=110` determined by dataset scan; `<EMPTY>`/`<NONE>` special tokens; sample_id–keyed embedding dict |
+| **step2** | Early concatenation of all inputs; GIN layers for permutation-equivariant message passing |
+| **step3** | `SoftNodeEmbedding` enables gradient flow from predictor back through logits during guidance |
+| **step4** | Cosine noise schedule; CE losses masked by `child_mask` before averaging (zero gradient from padding) |
+| **step5** | D3PM categorical posterior; `autograd.grad` with `allow_unused=True`; 25+ op dynamic DAG compiler |
 
-Download the pre-trained score network and move the checkpoint to ```checkpoints/scorenet``` directory:
-+ https://drive.google.com/file/d/1-GnItyf03-2r_KbYV3PCHS1FNVFXlNR3/view?usp=sharing
+## Data Preparation
 
-Download the pre-trained meta-predictor and move the checkpoint to ```checkpoints/meta_surrogate``` directory:
-+ https://drive.google.com/file/d/1oFXSLBPvorO_Ar-1JQQB49x7L1BX79gd/view?usp=sharing
-+ https://drive.google.com/file/d/1S2IV6L9t6Hlhh6vGsQkyqMJGt5NnJ8pj/view?usp=sharing
+### Dataset
 
-### Transfer NAG
-```
-bash script/transfer_nag.sh [GPU] [DATASET]
-## Examples
-bash script/transfer_nag.sh 0 cifar10
-bash script/transfer_nag.sh 0 cifar100
-bash script/transfer_nag.sh 0 aircraft
-bash script/transfer_nag.sh 0 pets
-```
+The training data is a JSONL file (`NAD_triplet_dataset.jsonl`) where each line contains:
 
-### Train score network
-```
-bash script/tr_scorenet.sh [GPU]
-```
-
-### Train meta-predictor
-```
-bash script/tr_meta_surrogate.sh [GPU]
-```
-
-
-## Run - MobileNetV3
-### Download datasets, preprocessed datasets, and checkpoints
-```
-cd MobileNetV3
-```
-
-If you want to run experiments on datasets that are not included in the benchmark, such as "aircraft" or "pets", you will need to download the raw dataset for actually trainining neural architectures on it:
-```
-## Download the raw dataset
-bash script/download_raw_dataset.sh [DATASET]
-```
-
-We use dataset encoding when training the meta-predictor or performing conditional sampling with the target dataset. To obtain dataset encoding, you need to download the preprocessed dataset:
-```
-## Download the preprocessed dataset
-bash script/download_preprocessed_dataset.sh
-```
-
-If you want to use the pre-trained score network or meta-predictor, download the checkpoints from the following links.
-
-Download the pre-trained score network and move the checkpoint to ```checkpoints/ofa/score_model``` directory:
-+ https://www.dropbox.com/scl/fi/r47svpl1tvpm9tos3vtsd/model_best.pth.tar?rlkey=5wpa6zh8cpp4gctuol25wxj0u&dl=0
-
-Download the first pre-trained meta-predictor and move the checkpoint to ```checkpoints/ofa/noise_aware_meta_surrogate``` directory:
-+ https://www.dropbox.com/scl/fi/k896bi61pu0rq87p5argx/model_best.pth.tar?rlkey=qo4ga96c5a3fu4228nnvift6v&dl=0
-
-Download the second pre-trained meta-predictor and move the checkpoint to ```checkpoints/ofa/unnoised_meta_surrogate_from_metad2a``` directory:
-+ https://www.dropbox.com/scl/fi/zfdis3njlfa1g5nsje3h8/ckpt_max_corr.pt?rlkey=1vplo2oiilljv6991ub0a50sb&dl=0
-
-Download the config file for TransferNAG experiments and move the checkpoint to ```configs``` directory:
-+ https://www.dropbox.com/scl/fi/psv7lh4bijwapj5jkgaq3/transfer_nag_ofa.pt?rlkey=wi15mjvme2pmep7p12auvm1ie&dl=0
-  
-### Transfer NAG
-```
-bash script/transfer_nag.sh [GPU] [DATASET]
-## Examples
-bash script/transfer_nag.sh 0,1 cifar10
-bash script/transfer_nag.sh 0,1 cifar100
-bash script/transfer_nag.sh 0,1 aircraft
-bash script/transfer_nag.sh 0,1 pets
-```
-
-### Train score network
-```
-bash script/tr_scorenet_ofa.sh [GPU]
-```
-
-### Train meta-predictor
-```
-bash script/tr_meta_surrogate_ofa.sh [GPU]
-```
-
-
-
-## Citation
-
-If you have found our work helpful for your research, we would appreciate it if you could acknowledge it by citing our work.
-
-```BibTex
-@inproceedings{an2023diffusionnag,
-  title={DiffusionNAG: Predictor-guided Neural Architecture Generation with Diffusion Models},
-  author={An, Sohyun and Lee, Hayeon and Jo, Jaehyeong and Lee, Seanie and Hwang, Sung Ju},
-  booktitle={The Twelfth International Conference on Learning Representations},
-  year={2023}
+```json
+{
+  "sample_id": "cifar10_s000000_0cdeeba3",
+  "parent_graph": "##ParentBlock##\n0:input\n1:output\n...",
+  "child_graph": "##ChildBlock##\n0:input\n1:output\n...",
+  "text": "spatial feature enhancement module"
 }
 ```
- 
+
+### Text Embeddings (CRITICAL)
+
+Text embeddings **must** be saved as a PyTorch dictionary mapping `sample_id` → `Tensor[768]`:
+
+```python
+import torch
+
+embed_dict = {
+    "cifar10_s000000_0cdeeba3": torch.tensor([0.0123, -0.0456, ...]),  # 768-dim
+    "cifar10_s000001_61df0aad": torch.tensor([0.0789, 0.0012, ...]),
+    # ... one entry per sample
+}
+torch.save(embed_dict, "baidu_text_embeddings.pt")
+```
+
+> **⚠️ WARNING:** The dictionary **must** be keyed by `sample_id` (e.g., `"cifar10_s000000_0cdeeba3"`), **not** by raw text strings. Multiple samples can share the same text description, so using text as keys would cause collisions and silent data corruption.
+
+**Why this design?** The `sample_id` key is read from the same JSONL row as the graphs inside `__getitem__`, so the embedding is always paired with the correct graph regardless of DataLoader shuffling, batching order, or multi-worker parallelism.
+
+If no `.pt` file is provided, the system falls back to deterministic dummy embeddings (hash-seeded random vectors). This is useful for pipeline testing but carries no semantic information.
+
+## Quick Start
+
+### Training
+
+```bash
+cd DiffusionNAG
+
+# Full training (GPU recommended)
+python graph2graph/step4_training.py  # uses defaults: hidden_dim=256, epochs=100
+
+# With real text embeddings
+python -c "
+from graph2graph.step4_training import train
+train(
+    jsonl_path='NAD_triplet_dataset.jsonl',
+    text_embed_path='baidu_text_embeddings.pt',  # real embeddings
+    hidden_dim=256,
+    batch_size=32,
+    num_epochs=100,
+    device_str='auto',
+)
+"
+
+# CPU dry-run test (small model, 2 epochs)
+python graph2graph/test_run.py
+```
+
+### Inference
+
+```bash
+python graph2graph/test_inference.py
+```
+
+This script:
+1. Loads the best checkpoint from `checkpoints/best.pt`
+2. Runs **reverse diffusion** (50 steps) with **classifier guidance** (λ=1.0)
+3. Decodes generated tensors → graph strings
+4. Validates each graph via **dummy tensor compilation** (builds a real PyTorch model and runs a forward pass)
+
+### Programmatic Usage
+
+```python
+from graph2graph.step5_inference import GraphSampler, decode_graph_tensors, validate_dag_compilation
+
+# Initialize sampler with trained models
+sampler = GraphSampler(denoiser, predictor, diffusion, vocab, device, guidance_scale=1.0)
+
+# Generate child DAG from parent DAG + text embedding
+gen_types, gen_attrs, gen_adj = sampler.sample(
+    parent_node_types, parent_node_attrs, parent_adj, parent_mask,
+    text_embedding, num_steps=100,
+)
+
+# Decode and validate
+graph_str = decode_graph_tensors(gen_types[0], gen_attrs[0], gen_adj[0], vocab)
+is_valid, msg = validate_dag_compilation(graph_str, dummy_input=torch.randn(1, 64, 32, 32))
+```
+
+## Requirements
+
+- Python 3.9+
+- PyTorch 2.0+
+- NumPy
+
+No additional dependencies are required. All graph operations are implemented in pure PyTorch.
+
+## License
+
+See the root repository license.
