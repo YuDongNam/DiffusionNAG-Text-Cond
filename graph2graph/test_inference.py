@@ -53,7 +53,7 @@ for cand in CKPT_CANDIDATES:
 # 학습 시 만든 vocab(27 types)과 동일한 임베딩 크기를 얻는다.
 # max_samples=20 같이 축소하면 vocab이 18 types가 되어
 # load_state_dict 시 shape mismatch 발생!
-train_loader, val_loader, vocab = create_dataloaders(
+train_loader, val_loader, test_loader, vocab = create_dataloaders(
     jsonl_path=JSONL_PATH, batch_size=4, num_workers=0,
     max_samples=None,   # ← 전체 데이터로 vocab 구축 (CRITICAL)
 )

@@ -425,35 +425,29 @@ class NADTripletDataset(Dataset):
 def create_dataloaders(
     jsonl_path: str,
     batch_size: int = 32,
-    train_ratio: float = 0.9,
     text_embed_dir: Optional[str] = None,
     text_embed_dict: Optional[dict] = None,
     num_workers: int = 4,
     seed: int = 42,
     max_samples: Optional[int] = None,
-) -> Tuple[DataLoader, DataLoader, GraphVocabulary]:
+) -> Tuple[DataLoader, DataLoader, DataLoader, GraphVocabulary]:
     """
-    Create train/val DataLoaders with a shared vocabulary.
+    Creates DataLoaders with a strict 80/10/10 Train/Val/Test split.
     
     Args:
-        text_embed_dict: Optional dict {sample_id: Tensor[768]} from .pt file.
-                         If provided, real embeddings are used instead of dummy.
+        jsonl_path:       Path to NAD_triplet_dataset.jsonl
+        batch_size:       Batch size
+        text_embed_dir:   legacy .npy directory
+        text_embed_dict:  Optional dict {sample_id: Tensor[768]} from .pt file.
+        num_workers:      Dataloader workers
+        seed:             Random seed for deterministic splitting
+        max_samples:      Debugging limit
     
     Returns:
-        train_loader : DataLoader
-        val_loader   : DataLoader
+        train_loader : DataLoader (80%)
+        val_loader   : DataLoader (10%)
+        test_loader  : DataLoader (10%)
         vocab        : GraphVocabulary (shared)
-    
-    Batched tensor shapes from the DataLoader:
-        parent_node_types : [B x N_MAX]           = [B x 110]
-        parent_node_attrs : [B x N_MAX x K]       = [B x 110 x 8]
-        parent_adj        : [B x N_MAX x N_MAX]   = [B x 110 x 110]
-        parent_mask       : [B x N_MAX]           = [B x 110]
-        child_node_types  : [B x N_MAX]           = [B x 110]
-        child_node_attrs  : [B x N_MAX x K]       = [B x 110 x 8]
-        child_adj         : [B x N_MAX x N_MAX]   = [B x 110 x 110]
-        child_mask        : [B x N_MAX]           = [B x 110]
-        text_embedding    : [B x TEXT_EMBED_DIM]   = [B x 768]
     """
     # Build full dataset to construct vocabulary
     full_dataset = NADTripletDataset(
@@ -465,17 +459,23 @@ def create_dataloaders(
     )
     vocab = full_dataset.vocab
 
-    # Split indices
+    # 80/10/10 split indices
     n = len(full_dataset)
     indices = list(range(n))
+    import random
     random.seed(seed)
     random.shuffle(indices)
-    split = int(n * train_ratio)
-    train_indices = indices[:split]
-    val_indices = indices[split:]
+    
+    train_split = int(n * 0.8)
+    val_split = int(n * 0.9)
+    
+    train_indices = indices[:train_split]
+    val_indices = indices[train_split:val_split]
+    test_indices = indices[val_split:]
 
     train_subset = torch.utils.data.Subset(full_dataset, train_indices)
     val_subset = torch.utils.data.Subset(full_dataset, val_indices)
+    test_subset = torch.utils.data.Subset(full_dataset, test_indices)
 
     train_loader = DataLoader(
         train_subset,
@@ -493,8 +493,17 @@ def create_dataloaders(
         pin_memory=True,
         drop_last=False,
     )
+    test_loader = DataLoader(
+        test_subset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=False,
+    )
 
-    return train_loader, val_loader, vocab
+    return train_loader, val_loader, test_loader, vocab
+
 
 
 # ============================================================================
@@ -516,15 +525,14 @@ if __name__ == "__main__":
 
     # --- Build dataset & vocab ---
     t0 = time.time()
-    train_loader, val_loader, vocab = create_dataloaders(
+    train_loader, val_loader, test_loader, vocab = create_dataloaders(
         jsonl_path=JSONL_PATH,
         batch_size=4,
-        train_ratio=0.9,
         num_workers=0,       # 0 for debugging
         max_samples=100,     # small subset for quick test
     )
     print(f"\nDataset built in {time.time() - t0:.2f}s")
-    print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+    print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}, Test batches: {len(test_loader)}")
 
     # --- Vocabulary summary ---
     print(f"\n--- Vocabulary ---")

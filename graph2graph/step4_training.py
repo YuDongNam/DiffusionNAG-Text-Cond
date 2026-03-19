@@ -479,14 +479,13 @@ def train(
     # ---------------------------------------------------------------
     # Data
     # ---------------------------------------------------------------
-    train_loader, val_loader, vocab = create_dataloaders(
+    train_loader, val_loader, test_loader, vocab = create_dataloaders(
         jsonl_path=jsonl_path,
         batch_size=batch_size,
-        train_ratio=0.9,
         text_embed_dict=text_embed_dict,
         num_workers=num_workers,
     )
-    print(f"Train: {len(train_loader)} batches, Val: {len(val_loader)} batches")
+    print(f"Train: {len(train_loader)} batches, Val: {len(val_loader)} batches, Test: {len(test_loader)} batches")
     print(f"Vocab:\n{vocab.summary()}")
 
     # ---------------------------------------------------------------
@@ -692,7 +691,7 @@ if __name__ == "__main__":
     device = torch.device("cpu")
 
     # Build small dataset
-    train_loader, val_loader, vocab = create_dataloaders(
+    train_loader, val_loader, test_loader, vocab = create_dataloaders(
         jsonl_path=JSONL_PATH,
         batch_size=4,
         num_workers=0,

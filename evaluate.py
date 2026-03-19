@@ -51,29 +51,15 @@ def evaluate(
         text_embed_dict = torch.load(text_embed_path, map_location="cpu")
         print(f"Loaded {len(text_embed_dict)} real text embeddings.")
 
-    # Build known_graphs set for Novelty calculation
-    known_graphs = set()
-    print("Building known graphs set for Novelty calculation...")
-    with open(jsonl_path, 'r') as f:
-        for line in f:
-            sample = json.loads(line)
-            # Normalize by stripping the first line (block name like ##ParentBlock##)
-            p_core = "\n".join(sample["parent_graph"].strip().split("\n")[1:])
-            c_core = "\n".join(sample["child_graph"].strip().split("\n")[1:])
-            known_graphs.add(p_core)
-            known_graphs.add(c_core)
-    print(f"Found {len(known_graphs)} unique graph topologies in dataset.")
-
-    # Data Loader (Validation Split)
-    _, val_loader, vocab = create_dataloaders(
+    # Data Loader (Test Split)
+    _, _, test_loader, vocab = create_dataloaders(
         jsonl_path=jsonl_path,
         batch_size=batch_size,
-        train_ratio=0.9,
         text_embed_dict=text_embed_dict,
         num_workers=4,
         max_samples=None,  # Must use full dataset to rebuild full vocab
     )
-    print(f"Validating on {len(val_loader.dataset)} samples ({len(val_loader)} batches).")
+    print(f"Validating on {len(test_loader.dataset)} TEST samples ({len(test_loader)} batches).")
 
     # Load Models
     hidden_dim = 256  # Default training dim, adapt if your checkpoint differs
@@ -115,13 +101,10 @@ def evaluate(
     valid_count = 0
     modified_count = 0
     total_cosine_sim = 0.0
-    
-    valid_graph_strs = []  # For Uniqueness / Novelty
-    latencies = []         # For Latency (forward pass time of valid graphs)
 
-    print("\nStarting evaluation...")
+    print("\nStarting evaluation on TEST set...")
     with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(val_loader)):
+        for batch_idx, batch in enumerate(tqdm(test_loader)):
             # Filter by dataset if specified
             if dataset_filter:
                 valid_indices = [i for i, sid in enumerate(batch["sample_id"]) if dataset_filter in sid]
@@ -135,6 +118,8 @@ def evaluate(
                 batch["sample_id"] = [batch["sample_id"][i] for i in valid_indices]
 
             B = batch["parent_node_types"].size(0)
+            if B == 0:
+                continue
             batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
             
             # Extract Parent Graph Strings (for modification rate check)
@@ -181,7 +166,7 @@ def evaluate(
             ).squeeze(1)  # [B]
             total_cosine_sim += align_sim.sum().item()
 
-            # 3. Validity, Modification Rate & Latency
+            # 3. Validity & Modification Rate
             # dummy_input MUST remain on CPU because validate_dag_compilation initializes modules on CPU
             dummy_input = torch.randn(1, 16, 32, 32)
             for b in range(B):
@@ -189,18 +174,13 @@ def evaluate(
                     gen_types[b], gen_attrs[b], gen_adj[b], vocab, block_name="GenBlock"
                 )
                 
-                # Check Validity & Latency
-                # We measure the time taken to build and run the graph
-                t0 = time.perf_counter()
+                # Check Validity 
                 is_valid, _ = validate_dag_compilation(gen_str, dummy_input)
-                t1 = time.perf_counter()
                 
                 g_core = "\n".join(gen_str.split("\n")[1:])  # normalized string without header
                 
                 if is_valid:
                     valid_count += 1
-                    valid_graph_strs.append(g_core)
-                    latencies.append((t1 - t0) * 1000)  # ms
                 
                 # Check Modification
                 # Extract the core architecture part (ignore the ##BlockName## header)
@@ -210,43 +190,27 @@ def evaluate(
             
             total_samples += B
 
-    # Calculate Uniqueness & Novelty
-    if valid_count > 0:
-        unique_valid_graphs = set(valid_graph_strs)
-        uniqueness_rate = len(unique_valid_graphs) / valid_count
-        
-        novel_graphs = unique_valid_graphs - known_graphs
-        novelty_rate = len(novel_graphs) / len(unique_valid_graphs)
-        
-        avg_latency_ms = sum(latencies) / len(latencies)
-    else:
-        uniqueness_rate = 0.0
-        novelty_rate = 0.0
-        avg_latency_ms = 0.0
-
     # Aggregate Metrics
+    if total_samples == 0:
+        print("No samples found matching criteria.")
+        return
+
     metrics = {
         "Total_Samples": total_samples,
         "Validity_Rate": float(valid_count) / total_samples,
-        "Uniqueness_Rate": uniqueness_rate,
-        "Novelty_Rate": novelty_rate,
         "Modification_Rate": float(modified_count) / total_samples,
         "Text_Graph_Alignment": total_cosine_sim / total_samples,
-        "Avg_Latency_ms": avg_latency_ms,
         "Num_Timesteps": num_timesteps,
         "Guidance_Scale": guidance_scale
     }
 
     print("\n" + "="*50)
-    print("🎯 Evaluation Results")
+    print("🎯 TEST Evaluation Results")
     print("="*50)
-    print(f"Total Samples Tested : {metrics['Total_Samples']}")
+    print(f"Total TEST Samples   : {metrics['Total_Samples']}")
     print(f"Validity Rate (%)    : {metrics['Validity_Rate'] * 100:.2f}%")
-    print(f"Uniqueness Rate (%)  : {metrics['Uniqueness_Rate'] * 100:.2f}%")
-    print(f"Novelty Rate (%)     : {metrics['Novelty_Rate'] * 100:.2f}%")
     print(f"Modification Rate (%): {metrics['Modification_Rate'] * 100:.2f}%")
     print(f"Text-Graph Alignment : {metrics['Text_Graph_Alignment']:.4f}")
-    print(f"Avg Latency (ms)     : {metrics['Avg_Latency_ms']:.2f} ms")
     print("="*50)
 
     out_filename = f"results_{dataset_filter}.json" if dataset_filter else "results.json"
