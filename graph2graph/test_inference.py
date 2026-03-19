@@ -85,7 +85,7 @@ predictor.eval()
 
 # ── 4. 테스트 배치 준비 ──────────────────────────────────────────────
 batch = next(iter(val_loader))
-batch = {k: v.to(device) for k, v in batch.items()}
+batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
 B = 2  # 2개 그래프만 생성
 
 print(f"\n--- 입력: Parent DAG (B={B}) ---")

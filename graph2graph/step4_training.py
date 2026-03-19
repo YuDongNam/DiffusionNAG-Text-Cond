@@ -330,8 +330,8 @@ def train_step(
     Returns:
         log_dict: dict of all loss values for logging
     """
-    # Move batch to device
-    batch = {k: v.to(device) for k, v in batch.items()}
+    # Move batch to device (only tensors)
+    batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
 
     B = batch["parent_node_types"].shape[0]
 
@@ -632,7 +632,7 @@ def validate(
     n_batches = 0
 
     for batch in val_loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
+        batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
         B = batch["parent_node_types"].shape[0]
 
         # Fixed middle timestep for consistent validation
@@ -721,7 +721,7 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------
     print("\n--- Test 2: Padding mask proof ---")
     denoiser.zero_grad()
-    batch = {k: v.to(device) for k, v in next(iter(train_loader)).items()}
+    batch = {k: v.to(device) for k, v in next(iter(train_loader)).items() if isinstance(v, torch.Tensor)}
     B = batch["child_mask"].shape[0]
     t = torch.randint(0, 100, (B,))
 
