@@ -11,7 +11,7 @@
    
 2. **전역 조건 주입 (Global Conditioning)**
    텍스트 임베딩은 잠재 공간 내에서 확산 시간 임베딩과 더해져 주입됩니다:
-   $$e_{\text{total}} = e_{\text{node}} + e_{\text{time}} + \text{Text\_MLP}(e_{\text{text}})$$
+   $$e_{\text{total}} = e_{\text{node}} + e_{\text{time}} + \text{Text-MLP}(e_{\text{text}})$$
    이 방식은 트랜스포머 블록 내부를 수정하지 않고도 텍스트 신호가 스코어 예측 벡터 필드에 전역적인 영향력을 행사할 수 있게 합니다.
    
 3. **영점 초기화(Zero-Initialization) 전략**
