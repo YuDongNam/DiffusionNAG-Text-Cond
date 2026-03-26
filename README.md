@@ -11,7 +11,7 @@ To ensure the mathematical validity of the generation process and prevent catast
    
 2. **Global Conditioning Injection**
    Text embeddings are injected into the latent space as an additive component to the diffusion timestep embedding:
-   $$e_{total} = e_{node} + e_{time} + \text{Text\_MLP}(e_{text})$$
+   $$e_{\text{total}} = e_{\text{node}} + e_{\text{time}} + \text{Text\_MLP}(e_{\text{text}})$$
    This approach allows the text signal to globally influence the denoising vector field without modifying the internal Transformer blocks.
    
 3. **Zero-Initialization Strategy**
