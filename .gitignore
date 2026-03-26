@@ -1,15 +1,28 @@
-__pycache__
-checkpoints/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pyc
+.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# Model Checkpoints (Strictly enforce ignoring large weight files)
+*.pth
+*.pth.tar
 *.pt
-!NAS-Bench-201/configs/transfer_nag_config.pt
-!NAS-Bench-201/data/transfer_nag/ridx.pt
-!NAS-Bench-201/data/transfer_nag/nasbench201.pt
-!NAS-Bench-201/data/transfer_nag/nasbench201_info.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_tasks_predictor.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_tasks_predictor_idx.pt
-!NAS-Bench-201/data/transfer_nag/meta_train_task_lst.pt
-exp/
-vis/
+checkpoints/
+
+# Evaluation Metrics & Results
 results/
-.empty/
-.prev/
+*.json
+*.csv
+
+# Large Datasets
+data/
+*.db
+*.sqlite
+NAS-Bench-201-v1_1-096897.pth
