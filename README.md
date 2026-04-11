@@ -37,6 +37,8 @@ DiffusionNAG/
 │   ├── baseline_diffusion_nag.py    # Training script (Score Matching on X_child)
 │   ├── evaluate_baseline.py         # Evaluation script (SDEdit from X_parent)
 │   ├── models/                      # CATE model definitions
+│   ├── data/
+│   │   ├── text_embeddings.pt       # bge-m3
 │   ├── checkpoints/                 # Model Weights
 │   │   ├── checkpoint.pth.tar       # [REQUIRED] Pre-trained frozen CATE weights
 │   │   └── baseline_text_mlp.pth    # [GENERATED] Trained Text_MLP adapter weights
